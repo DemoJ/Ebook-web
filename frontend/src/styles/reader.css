@@ -93,6 +93,7 @@
   display: none;
   inset: 0;
   position: absolute;
+  touch-action: pan-y;
   z-index: 5;
 }
 .tap-zone {
@@ -104,6 +105,10 @@
 }
 .tap-zone.left, .tap-zone.right { width: 28%; }
 .tap-zone.mid { flex: 1; width: auto; }
+
+@media (max-width: 700px) {
+  .reader-tap-zones { touch-action: pan-y; }
+}
 
 .reader-overlay {
   align-items: center;

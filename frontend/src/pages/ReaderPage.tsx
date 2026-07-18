@@ -1,5 +1,11 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, List, Moon, Settings2, Sun, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 import { Link, useParams } from "react-router-dom";
 import { booksApi } from "../api/books";
 import { useAuth } from "../auth/AuthContext";
@@ -17,6 +23,8 @@ export function ReaderPage() {
   const [fontSize, setFontSize] = useState(() => loadReaderSettings(user?.id).fontSize);
   const [metaError, setMetaError] = useState("");
   const [chromeVisible, setChromeVisible] = useState(true);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressTapRef = useRef(false);
   const reader = useEpubReader(id, container);
 
   useEffect(() => {
@@ -76,42 +84,6 @@ export function ReaderPage() {
   }, [chromeVisible, panel, reader.loading, reader.resizeToContainer]);
 
   useEffect(() => {
-    const rendition = reader.rendition.current;
-    if (!rendition || reader.loading) return;
-
-    const onClick = (event: MouseEvent) => {
-      if (panel) {
-        setPanel(null);
-        return;
-      }
-      const target = event.target as HTMLElement | null;
-      if (target?.closest?.("a")) return;
-
-      const view = (event.view || (target?.ownerDocument?.defaultView ?? null)) as Window | null;
-      const frame = view?.frameElement as HTMLElement | null;
-      const rect = frame?.getBoundingClientRect() ?? container?.getBoundingClientRect();
-      if (!rect || rect.width <= 0) return;
-
-      const x = event.clientX;
-      const ratio = (x - rect.left) / rect.width;
-      if (ratio < 0.28) {
-        reader.rendition.current?.prev();
-        return;
-      }
-      if (ratio > 0.72) {
-        reader.rendition.current?.next();
-        return;
-      }
-      setChromeVisible((value) => !value);
-    };
-
-    rendition.on("click", onClick);
-    return () => {
-      rendition.off("click", onClick);
-    };
-  }, [reader.loading, panel, container]);
-
-  useEffect(() => {
     if (reader.loading) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -147,6 +119,40 @@ export function ReaderPage() {
   function nextPage(event?: { currentTarget?: HTMLElement }) {
     event?.currentTarget?.blur();
     reader.rendition.current?.next();
+  }
+
+  function onTouchStart(event: ReactTouchEvent<HTMLDivElement>) {
+    const touch = event.changedTouches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    suppressTapRef.current = false;
+  }
+
+  function onTouchEnd(event: ReactTouchEvent<HTMLDivElement>) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start) return;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+
+    event.preventDefault();
+    suppressTapRef.current = true;
+    if (deltaX < 0) nextPage();
+    else prevPage();
+  }
+
+  function onTapZoneClick(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    action: (event: ReactMouseEvent<HTMLButtonElement>) => void,
+  ) {
+    if (suppressTapRef.current) {
+      suppressTapRef.current = false;
+      event.preventDefault();
+      return;
+    }
+    action(event);
   }
 
   function toggleChrome() {
@@ -201,10 +207,15 @@ export function ReaderPage() {
           <ChevronLeft />
         </button>
         <div ref={setContainer} className="epub-container" />
-        <div className="reader-tap-zones" aria-hidden={!chromeOpen}>
-          <button type="button" className="tap-zone left" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={(e) => prevPage(e)} aria-label="上一页" />
-          <button type="button" className="tap-zone mid" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={toggleChrome} aria-label="显示或隐藏菜单" />
-          <button type="button" className="tap-zone right" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={(e) => nextPage(e)} aria-label="下一页" />
+        <div
+          className="reader-tap-zones"
+          aria-hidden={!chromeOpen}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          <button type="button" className="tap-zone left" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={(e) => onTapZoneClick(e, prevPage)} aria-label="上一页" />
+          <button type="button" className="tap-zone mid" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={(e) => onTapZoneClick(e, toggleChrome)} aria-label="显示或隐藏菜单" />
+          <button type="button" className="tap-zone right" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={(e) => onTapZoneClick(e, nextPage)} aria-label="下一页" />
         </div>
         {reader.loading && (
           <div className="reader-overlay">
