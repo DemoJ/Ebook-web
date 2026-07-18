@@ -1,6 +1,16 @@
-# LeafRead · 多用户 EPUB 阅读网站
+# LeafRead · 电子书阅读网站
 
-P0 MVP：多用户登录、EPUB 上传与在线阅读、私有/共享书库、阅读进度续读隔离、超级管理员用户与书籍治理。
+LeafRead 是一个同时适配电脑端和手机端的多用户 EPUB 在线阅读网站。用户可以上传并管理自己的电子书，将书籍设为私有或共享，并在任意设备上从上次中断的位置继续阅读；每位用户的书架和阅读进度相互隔离。电脑端支持键盘翻页，手机端支持沉浸式阅读、点击分区翻页及左右滑动翻页。
+
+## 效果预览
+
+### 书架界面
+
+![LeafRead 书架界面](./images/image1.png)
+
+### 阅读界面
+
+![LeafRead 阅读界面](./images/image2.png)
 
 ## 技术栈
 
@@ -142,4 +152,3 @@ docker-compose.yaml   Docker 编排
 .env.example          Docker 环境变量模板
 backend/.env.example  本地后端环境变量模板
 ```
-
