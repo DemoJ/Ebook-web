@@ -2,22 +2,26 @@ import { ArrowLeft, ChevronLeft, ChevronRight, List, Moon, Settings2, Sun, X } f
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { booksApi } from "../api/books";
+import { useAuth } from "../auth/AuthContext";
 import { ErrorState, getErrorMessage, LoadingState } from "../components/States";
 import { useEpubReader } from "../reader/useEpubReader";
 import type { Book, TocItem } from "../types";
 
 export function ReaderPage() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const [panel, setPanel] = useState<"toc" | "settings" | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [fontSize, setFontSize] = useState(() => (
-    typeof window !== "undefined" && window.matchMedia("(min-width: 701px)").matches ? 120 : 100
-  ));
+  const [theme, setTheme] = useState<"light" | "dark">(() => loadReaderSettings(user?.id).theme);
+  const [fontSize, setFontSize] = useState(() => loadReaderSettings(user?.id).fontSize);
   const [metaError, setMetaError] = useState("");
   const [chromeVisible, setChromeVisible] = useState(true);
   const reader = useEpubReader(id, container);
+
+  useEffect(() => {
+    saveReaderSettings(user?.id, { theme, fontSize });
+  }, [fontSize, theme, user?.id]);
 
   useEffect(() => {
     if (!id) return;
@@ -289,4 +293,36 @@ function TocEntry({ item, display }: { item: TocItem; display: (href: string) =>
       ))}
     </div>
   );
+}
+
+type ReaderSettings = { theme: "light" | "dark"; fontSize: number };
+
+function loadReaderSettings(userId?: number): ReaderSettings {
+  const defaultFontSize = typeof window !== "undefined"
+    && window.matchMedia("(min-width: 701px)").matches ? 120 : 100;
+  const defaults = { theme: "light" as const, fontSize: defaultFontSize };
+  if (!userId || typeof window === "undefined") return defaults;
+
+  try {
+    const raw = window.localStorage.getItem(`leafread:reader-settings:${userId}`);
+    if (!raw) return defaults;
+    const saved = JSON.parse(raw) as Partial<ReaderSettings>;
+    return {
+      theme: saved.theme === "dark" ? "dark" : "light",
+      fontSize: typeof saved.fontSize === "number" && saved.fontSize >= 80 && saved.fontSize <= 160
+        ? saved.fontSize
+        : defaultFontSize,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+function saveReaderSettings(userId: number | undefined, settings: ReaderSettings) {
+  if (!userId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(`leafread:reader-settings:${userId}`, JSON.stringify(settings));
+  } catch {
+    // Private browsing or disabled storage should not affect reading.
+  }
 }
