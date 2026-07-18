@@ -1,0 +1,46 @@
+.app-shell { min-height: 100vh; }
+.sidebar { background: #242821; color: #e8e4d9; display: flex; flex-direction: column; height: 100vh; left: 0; padding: 28px 19px 20px; position: fixed; top: 0; width: 246px; z-index: 30; }
+.brand { align-items: center; display: flex; gap: 12px; margin: 0 8px 43px; }
+.brand > span { align-items: center; background: var(--accent); border-radius: 8px; display: flex; height: 38px; justify-content: center; transform: rotate(-3deg); width: 38px; }
+.brand svg { height: 20px; }
+.brand div { display: flex; flex-direction: column; }
+.brand b { font-family: Georgia, serif; font-size: 19px; letter-spacing: .02em; }
+.brand small { color: #aaa99f; font-size: 10px; letter-spacing: .1em; margin-top: 3px; }
+.sidebar nav { flex: 1; }
+.sidebar nav > a { align-items: center; border-radius: 7px; color: #c1c2ba; display: flex; font-size: 14px; gap: 12px; margin-bottom: 5px; padding: 11px 12px; }
+.sidebar nav > a svg { height: 18px; width: 18px; }
+.sidebar nav > a:hover { background: #30352d; color: white; }
+.sidebar nav > a.active { background: #3b3f36; color: #fff; position: relative; }
+.sidebar nav > a.active::before { background: #d17858; border-radius: 0 4px 4px 0; content: ""; height: 22px; left: -19px; position: absolute; width: 3px; }
+.nav-label { color: #74796f; font-size: 10px; font-weight: 800; letter-spacing: .13em; margin: 24px 12px 9px; text-transform: uppercase; }
+.nav-label:first-child { margin-top: 0; }
+.user-panel { align-items: center; border-top: 1px solid #3c4038; display: grid; gap: 10px; grid-template-columns: 36px 1fr 36px; padding: 19px 5px 0; }
+.avatar, .large-avatar { align-items: center; background: #d3a17f; border-radius: 50%; color: #39241c; display: flex; font-family: Georgia, serif; font-weight: bold; justify-content: center; }
+.avatar { height: 35px; width: 35px; }
+.user-panel > div:nth-child(2) { display: flex; flex-direction: column; min-width: 0; }
+.user-panel b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-panel small { color: #90928a; font-size: 11px; margin-top: 3px; }
+.user-panel .icon-button { color: #a9aba4; }
+.main-content { margin-left: 246px; min-height: 100vh; }
+.mobile-menu, .nav-scrim { display: none; }
+
+.page { margin: 0 auto; max-width: 1460px; padding: 56px clamp(30px, 5vw, 76px) 70px; }
+.narrow-page { max-width: 1000px; margin-left: 0; }
+.page-header { align-items: flex-end; display: flex; justify-content: space-between; margin-bottom: 43px; }
+.page-header h1 { font-size: clamp(31px, 3vw, 42px); font-weight: 500; letter-spacing: -.025em; margin-bottom: 10px; }
+.page-header > div > p:last-child { color: var(--muted); font-size: 14px; margin: 0; }
+.section { margin-top: 40px; }
+.section-heading { align-items: baseline; display: flex; justify-content: space-between; margin-bottom: 20px; }
+.section-heading h2 { font-size: 23px; font-weight: 500; margin: 0; }
+.section-heading span { color: var(--muted); font-size: 12px; }
+
+@media (max-width: 850px) {
+  .mobile-menu { align-items: center; background: #282c26; border: 0; border-radius: 0 0 9px 0; color: white; display: flex; height: 47px; justify-content: center; left: 0; position: fixed; top: 0; width: 49px; z-index: 50; }
+  .sidebar { box-shadow: 10px 0 30px rgba(0,0,0,.25); transform: translateX(-105%); transition: transform .25s ease; }
+  .sidebar.open { transform: translateX(0); }
+  .nav-scrim { background: rgba(0,0,0,.3); display: block; inset: 0; position: fixed; z-index: 25; }
+  .main-content { margin-left: 0; }
+  .page { padding: 77px 20px 45px; }
+  .page-header { align-items: flex-start; flex-direction: column; gap: 22px; margin-bottom: 30px; }
+  .page-header > .button { width: 100%; }
+}

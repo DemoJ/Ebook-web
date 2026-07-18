@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ebook
+      POSTGRES_USER: ebook
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ebook-pass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ebook -d ebook"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      EBOOK_DATABASE_URL: postgresql+psycopg://ebook:${POSTGRES_PASSWORD:-ebook-pass}@db:5432/ebook
+      EBOOK_SECRET_KEY: ${EBOOK_SECRET_KEY:-please-change-this-secret-key-now}
+      EBOOK_COOKIE_SECURE: ${EBOOK_COOKIE_SECURE:-false}
+      EBOOK_STORAGE_DIR: /data/storage
+      EBOOK_SUPERADMIN_USERNAME: ${EBOOK_SUPERADMIN_USERNAME:-admin}
+      EBOOK_SUPERADMIN_PASSWORD: ${EBOOK_SUPERADMIN_PASSWORD:-admin123}
+      EBOOK_ACCESS_TOKEN_MINUTES: ${EBOOK_ACCESS_TOKEN_MINUTES:-480}
+      EBOOK_MAX_UPLOAD_BYTES: ${EBOOK_MAX_UPLOAD_BYTES:-104857600}
+    volumes:
+      - bookdata:/data/storage
+    expose:
+      - "8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "${PORT:-8080}:80"
+
+volumes:
+  pgdata:
+  bookdata:
