@@ -11,12 +11,31 @@ interface LocationEvent {
 export function useEpubReader(bookId: string | undefined, container: HTMLDivElement | null) {
   const bookRef = useRef<EpubBook | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(container);
   const latestRef = useRef({ location: "", percentage: 0 });
   const timerRef = useRef<number | undefined>(undefined);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  containerRef.current = container;
+
+  function resizeToContainer() {
+    const host = containerRef.current;
+    const next = renditionRef.current as (Rendition & {
+      manager?: { resize?: (w: number, h: number) => void };
+    }) | null;
+    if (!host || !next?.manager?.resize) return;
+    const nextWidth = host.clientWidth;
+    const nextHeight = host.clientHeight;
+    if (nextWidth <= 0 || nextHeight <= 0) return;
+    try {
+      next.resize(nextWidth, nextHeight);
+    } catch {
+      // epub.js may throw while views are not ready
+    }
+  }
 
   useEffect(() => {
     if (!bookId || !container) return;
@@ -55,24 +74,9 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
         if (!active) return;
         if (saved?.percentage != null) setProgress(saved.percentage / 100);
 
-        const safeResize = () => {
-          const next = renditionRef.current as (Rendition & {
-            manager?: { resize?: (w: number, h: number) => void };
-          }) | null;
-          if (!next?.manager?.resize) return;
-          const nextWidth = container!.clientWidth;
-          const nextHeight = container!.clientHeight;
-          if (nextWidth <= 0 || nextHeight <= 0) return;
-          try {
-            next.resize(nextWidth, nextHeight);
-          } catch {
-            // epub.js may throw while views are not ready
-          }
-        };
-
         resizeObserver = new ResizeObserver(() => {
           window.clearTimeout(resizeTimer);
-          resizeTimer = window.setTimeout(safeResize, 80);
+          resizeTimer = window.setTimeout(resizeToContainer, 80);
         });
         resizeObserver.observe(container!);
         setLoading(false);
@@ -125,5 +129,5 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
     };
   });
 
-  return { toc, progress, loading, error, rendition: renditionRef, saveNow };
+  return { toc, progress, loading, error, rendition: renditionRef, saveNow, resizeToContainer };
 }

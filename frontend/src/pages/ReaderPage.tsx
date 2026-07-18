@@ -52,6 +52,14 @@ export function ReaderPage() {
   }, [theme, fontSize, reader.loading]);
 
   useEffect(() => {
+    if (reader.loading) return;
+    const frame = window.requestAnimationFrame(() => {
+      reader.resizeToContainer();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [chromeVisible, panel, reader.loading, reader.resizeToContainer]);
+
+  useEffect(() => {
     const rendition = reader.rendition.current;
     if (!rendition || reader.loading) return;
 

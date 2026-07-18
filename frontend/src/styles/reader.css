@@ -186,18 +186,33 @@
   .reader-header {
     grid-template-columns: 55px 1fr 80px;
     height: 52px;
+    left: 0;
     padding: 0 10px;
+    position: fixed;
+    right: 0;
+    top: 0;
   }
   .reader-back { font-size: 0; }
   .reader-percent { display: none; }
   .reader-tools .icon-button { padding: 5px; }
 
+  .reader-progress {
+    left: 0;
+    position: fixed;
+    right: 0;
+    top: 52px;
+  }
+
   .reader-stage {
+    flex: 1 1 auto;
+    height: 100%;
     max-width: none;
-    padding: 0;
+    min-height: 0;
+    padding: 52px 0 46px;
+    transition: padding .22s ease;
   }
   .reader-nav { display: none; }
-  .reader-overlay { inset: 0; }
+  .reader-overlay { inset: 52px 0 46px; }
   .reader-panel { top: 54px; width: 90vw; }
 
   .reader-tap-zones { display: flex; }
@@ -208,7 +223,6 @@
     border-top: 1px solid #d7d1c6;
     bottom: 0;
     display: flex;
-    flex: 0 0 auto;
     height: 46px;
     justify-content: space-between;
     left: 0;
@@ -238,8 +252,16 @@
     transform: translateY(-100%);
   }
   .reader-page.chrome-hidden .reader-footer { transform: translateY(100%); }
-  .reader-page.chrome-hidden .reader-progress { opacity: 0; }
-  .reader-page.chrome-hidden .reader-stage { flex: 1; }
+  .reader-page.chrome-hidden .reader-progress {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .reader-page.chrome-hidden .reader-stage {
+    padding: 0;
+  }
+  .reader-page.chrome-hidden .reader-overlay {
+    inset: 0;
+  }
   .reader-page.chrome-hidden .epub-container {
     border-radius: 0;
     box-shadow: none;
