@@ -7,7 +7,7 @@
   overflow: hidden;
   transition: background .2s;
 }
-.reader-page.dark { background: #111411; color: #ddd8cd; }
+.reader-page.dark { background: #121416; color: #c8cdd3; }
 
 .reader-header {
   align-items: center;
@@ -22,7 +22,7 @@
   transition: transform .22s ease, opacity .22s ease;
   z-index: 10;
 }
-.dark .reader-header { background: #20231f; border-color: #343832; }
+.dark .reader-header { background: #1b1e22; border-color: #2c3138; }
 .reader-back { align-items: center; display: flex; font-size: 12px; font-weight: 700; gap: 8px; }
 .reader-back svg { height: 18px; }
 .reader-title { align-items: center; display: flex; flex-direction: column; min-width: 0; }
@@ -65,7 +65,7 @@
   height: 100%;
   overflow: hidden;
 }
-.dark .epub-container { background: #1b1d1b; box-shadow: 0 8px 28px rgba(0,0,0,.35); }
+.dark .epub-container { background: #1a1c1f; box-shadow: 0 8px 28px rgba(0,0,0,.35); }
 
 .reader-nav {
   background: transparent;
@@ -114,7 +114,7 @@
   position: absolute;
   z-index: 8;
 }
-.dark .reader-overlay { background: #1b1d1b; }
+.dark .reader-overlay { background: #1a1c1f; }
 
 .reader-panel {
   background: #f9f6ef;
@@ -128,7 +128,7 @@
   width: min(360px, 90vw);
   z-index: 20;
 }
-.dark .reader-panel { background: #222520; border-color: #3a3e37; }
+.dark .reader-panel { background: #1d2025; border-color: #2f353d; }
 .reader-panel > header {
   align-items: center;
   border-bottom: 1px solid #ded9cf;
@@ -136,7 +136,7 @@
   justify-content: space-between;
   padding: 16px 18px;
 }
-.dark .reader-panel > header { border-color: #3a3e37; }
+.dark .reader-panel > header { border-color: #2f353d; }
 .reader-panel h2 { font-size: 18px; margin: 0; }
 
 .toc-list { padding: 12px 16px 24px; }
@@ -231,7 +231,7 @@
     right: 0;
     z-index: 12;
   }
-  .dark .reader-footer { background: #20231f; border-color: #343832; }
+  .dark .reader-footer { background: #1b1e22; border-color: #2c3138; }
   .reader-footer button {
     align-items: center;
     background: none;

@@ -26,7 +26,7 @@ export function ReaderPage() {
 
   useEffect(() => {
     const rendition = reader.rendition.current;
-    if (!rendition) return;
+    if (!rendition || reader.loading) return;
     rendition.themes.register("light", {
       body: {
         color: "#2b2924",
@@ -39,15 +39,27 @@ export function ReaderPage() {
     });
     rendition.themes.register("dark", {
       body: {
-        color: "#d8d3c8",
-        background: "#1b1d1b",
+        color: "#c8cdd3",
+        background: "#1a1c1f",
         "font-size": "18px",
         "line-height": "1.85",
       },
       "p, li, div": { "line-height": "1.85" },
-      a: { color: "#d99672" },
+      a: { color: "#8ab4f8" },
     });
+  }, [reader.loading]);
+
+  useEffect(() => {
+    const rendition = reader.rendition.current;
+    if (!rendition || reader.loading) return;
+    const colors = theme === "dark"
+      ? { background: "#1a1c1f", text: "#c8cdd3" }
+      : { background: "#fbfaf6", text: "#2b2924" };
+
     rendition.themes.select(theme);
+    rendition.themes.override("background", colors.background, true);
+    rendition.themes.override("background-color", colors.background, true);
+    rendition.themes.override("color", colors.text, true);
     rendition.themes.fontSize(`${fontSize}%`);
   }, [theme, fontSize, reader.loading]);
 
