@@ -47,7 +47,8 @@ def _check_archive(archive: zipfile.ZipFile, settings: Settings) -> None:
     mime_info = archive.getinfo("mimetype")
     if mime_info.compress_type != zipfile.ZIP_STORED:
         _reject("EPUB mimetype must be uncompressed")
-    if archive.read("mimetype") != b"application/epub+zip":
+    mimetype = archive.read("mimetype").decode("utf-8-sig", errors="replace").strip()
+    if mimetype != "application/epub+zip":
         _reject("Invalid EPUB mimetype")
 
 
