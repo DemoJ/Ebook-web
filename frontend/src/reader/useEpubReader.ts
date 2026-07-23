@@ -15,12 +15,17 @@ function yieldToMain() {
   });
 }
 
+function clampPercent(value: number) {
+  return Math.min(100, Math.max(0, value));
+}
+
 export function useEpubReader(bookId: string | undefined, container: HTMLDivElement | null) {
   const bookRef = useRef<EpubBook | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(container);
   const latestRef = useRef({ location: "", percentage: 0 });
   const locationsReadyRef = useRef(false);
+  const suppressSaveRef = useRef(false);
   const timerRef = useRef<number | undefined>(undefined);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [progress, setProgress] = useState(0);
@@ -51,50 +56,65 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
     let resizeObserver: ResizeObserver | undefined;
     let resizeTimer: number | undefined;
     locationsReadyRef.current = false;
+    suppressSaveRef.current = false;
+    latestRef.current = { location: "", percentage: 0 };
+
+    function applyProgressFromCfi(epub: EpubBook, cfi: string) {
+      if (!cfi) return;
+      const ratio = epub.locations.percentageFromCfi(cfi);
+      if (typeof ratio !== "number" || Number.isNaN(ratio)) return;
+      const percentage = clampPercent(ratio * 100);
+      latestRef.current = { location: cfi, percentage };
+      setProgress(ratio);
+    }
 
     async function prepareLocations(epub: EpubBook, id: string) {
       await yieldToMain();
       if (!active || bookRef.current !== epub) return;
 
-      const cached = await loadCachedLocations(id);
-      if (!active || bookRef.current !== epub) return;
-
-      if (cached) {
-        epub.locations.load(cached);
-      } else {
+      try {
         await epub.locations.generate(1200);
         if (!active || bookRef.current !== epub) return;
         const serialized = epub.locations.save();
         if (serialized) await saveCachedLocations(id, serialized);
+        if (!active || bookRef.current !== epub) return;
+        locationsReadyRef.current = true;
+        applyProgressFromCfi(epub, latestRef.current.location);
+      } catch {
+        // 后台生成失败不影响阅读，进度沿用服务端值
       }
-
-      if (!active || bookRef.current !== epub) return;
-      locationsReadyRef.current = true;
-
-      const cfi = latestRef.current.location;
-      if (!cfi) return;
-      const ratio = epub.locations.percentageFromCfi(cfi) || 0;
-      latestRef.current = {
-        location: cfi,
-        percentage: Math.min(100, Math.max(0, ratio * 100)),
-      };
-      setProgress(ratio);
     }
 
     async function initialize() {
       try {
         setLoading(true);
         setError("");
-        const [buffer, saved] = await Promise.all([
+        const [buffer, saved, cachedLocations] = await Promise.all([
           loadEpubBuffer(bookId!),
           booksApi.progress(bookId!).catch(() => null),
+          loadCachedLocations(bookId!),
         ]);
         if (!active) return;
+
+        // 先灌入服务端进度，避免 display 触发的 relocated 把进度写成 0
+        if (saved?.location) {
+          latestRef.current = {
+            location: saved.location,
+            percentage: saved.percentage ?? 0,
+          };
+          if (saved.percentage != null) setProgress(saved.percentage / 100);
+        }
 
         const epub = ePub(buffer);
         bookRef.current = epub;
         await epub.ready;
         if (!active) return;
+
+        // 有缓存则同步加载 locations，二次打开进度立刻准确
+        if (cachedLocations) {
+          epub.locations.load(cachedLocations);
+          locationsReadyRef.current = true;
+        }
 
         const navigation = await epub.loaded.navigation;
         if (!active) return;
@@ -110,16 +130,16 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
         });
         renditionRef.current = rendition;
         rendition.on("relocated", onRelocated);
+
+        // 首屏 display 期间禁止写库，防止瞬时 0% 覆盖真实进度
+        suppressSaveRef.current = true;
         await rendition.display(saved?.location || undefined);
+        suppressSaveRef.current = false;
         if (!active) return;
-        if (saved?.percentage != null) {
-          setProgress(saved.percentage / 100);
-          if (saved.location) {
-            latestRef.current = {
-              location: saved.location,
-              percentage: saved.percentage,
-            };
-          }
+
+        // display 后若 locations 已就绪，用 CFI 校正百分比
+        if (locationsReadyRef.current && latestRef.current.location) {
+          applyProgressFromCfi(epub, latestRef.current.location);
         }
 
         resizeObserver = new ResizeObserver(() => {
@@ -129,8 +149,12 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
         resizeObserver.observe(container!);
         setLoading(false);
 
-        void prepareLocations(epub, bookId!);
+        // 无缓存时后台生成，不阻塞首屏
+        if (!locationsReadyRef.current) {
+          void prepareLocations(epub, bookId!);
+        }
       } catch (nextError) {
+        suppressSaveRef.current = false;
         if (active) {
           setError(getErrorMessage(nextError));
           setLoading(false);
@@ -141,6 +165,7 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
     initialize();
     return () => {
       active = false;
+      suppressSaveRef.current = false;
       saveNow();
       window.clearTimeout(timerRef.current);
       window.clearTimeout(resizeTimer);
@@ -155,18 +180,22 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
 
   function onRelocated(location: LocationEvent) {
     const cfi = location.start?.cfi || "";
-    let ratio = location.start?.percentage;
-    if (ratio == null && locationsReadyRef.current) {
-      ratio = bookRef.current?.locations.percentageFromCfi(cfi) || 0;
+    if (!cfi) return;
+
+    // locations 未就绪时：只更新 CFI，百分比沿用服务端/上次可信值，绝不采信 epub.js 的 0
+    let percentage = latestRef.current.percentage;
+    if (locationsReadyRef.current) {
+      const ratio =
+        typeof location.start?.percentage === "number" && !Number.isNaN(location.start.percentage)
+          ? location.start.percentage
+          : bookRef.current?.locations.percentageFromCfi(cfi) ?? percentage / 100;
+      percentage = clampPercent(ratio * 100);
+      setProgress(ratio);
     }
-    if (ratio == null) {
-      ratio = latestRef.current.percentage / 100;
-    }
-    latestRef.current = {
-      location: cfi,
-      percentage: Math.min(100, Math.max(0, ratio * 100)),
-    };
-    setProgress(ratio);
+
+    latestRef.current = { location: cfi, percentage };
+
+    if (suppressSaveRef.current) return;
     window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(saveNow, 1500);
   }
