@@ -3,9 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import { booksApi } from "../api/books";
 import type { TocItem } from "../types";
 import { getErrorMessage } from "../components/States";
+import { loadCachedLocations, loadEpubBuffer, saveCachedLocations } from "./epubCache";
 
 interface LocationEvent {
   start?: { cfi?: string; percentage?: number };
+}
+
+function yieldToMain() {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 0);
+  });
 }
 
 export function useEpubReader(bookId: string | undefined, container: HTMLDivElement | null) {
@@ -13,6 +20,7 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
   const renditionRef = useRef<Rendition | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(container);
   const latestRef = useRef({ location: "", percentage: 0 });
+  const locationsReadyRef = useRef(false);
   const timerRef = useRef<number | undefined>(undefined);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [progress, setProgress] = useState(0);
@@ -42,20 +50,52 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
     let active = true;
     let resizeObserver: ResizeObserver | undefined;
     let resizeTimer: number | undefined;
+    locationsReadyRef.current = false;
+
+    async function prepareLocations(epub: EpubBook, id: string) {
+      await yieldToMain();
+      if (!active || bookRef.current !== epub) return;
+
+      const cached = await loadCachedLocations(id);
+      if (!active || bookRef.current !== epub) return;
+
+      if (cached) {
+        epub.locations.load(cached);
+      } else {
+        await epub.locations.generate(1200);
+        if (!active || bookRef.current !== epub) return;
+        const serialized = epub.locations.save();
+        if (serialized) await saveCachedLocations(id, serialized);
+      }
+
+      if (!active || bookRef.current !== epub) return;
+      locationsReadyRef.current = true;
+
+      const cfi = latestRef.current.location;
+      if (!cfi) return;
+      const ratio = epub.locations.percentageFromCfi(cfi) || 0;
+      latestRef.current = {
+        location: cfi,
+        percentage: Math.min(100, Math.max(0, ratio * 100)),
+      };
+      setProgress(ratio);
+    }
 
     async function initialize() {
       try {
         setLoading(true);
         setError("");
-        const [response, saved] = await Promise.all([
-          fetch(booksApi.fileUrl(bookId!), { credentials: "include" }),
+        const [buffer, saved] = await Promise.all([
+          loadEpubBuffer(bookId!),
           booksApi.progress(bookId!).catch(() => null),
         ]);
-        if (!response.ok) throw new Error(`无法加载书籍文件（${response.status}）`);
-        const epub = ePub(await response.arrayBuffer());
+        if (!active) return;
+
+        const epub = ePub(buffer);
         bookRef.current = epub;
         await epub.ready;
-        await epub.locations.generate(1200);
+        if (!active) return;
+
         const navigation = await epub.loaded.navigation;
         if (!active) return;
         setToc(navigation.toc as TocItem[]);
@@ -72,7 +112,15 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
         rendition.on("relocated", onRelocated);
         await rendition.display(saved?.location || undefined);
         if (!active) return;
-        if (saved?.percentage != null) setProgress(saved.percentage / 100);
+        if (saved?.percentage != null) {
+          setProgress(saved.percentage / 100);
+          if (saved.location) {
+            latestRef.current = {
+              location: saved.location,
+              percentage: saved.percentage,
+            };
+          }
+        }
 
         resizeObserver = new ResizeObserver(() => {
           window.clearTimeout(resizeTimer);
@@ -80,6 +128,8 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
         });
         resizeObserver.observe(container!);
         setLoading(false);
+
+        void prepareLocations(epub, bookId!);
       } catch (nextError) {
         if (active) {
           setError(getErrorMessage(nextError));
@@ -99,14 +149,23 @@ export function useEpubReader(bookId: string | undefined, container: HTMLDivElem
       bookRef.current?.destroy();
       renditionRef.current = null;
       bookRef.current = null;
+      locationsReadyRef.current = false;
     };
   }, [bookId, container]);
 
   function onRelocated(location: LocationEvent) {
     const cfi = location.start?.cfi || "";
-    const ratio = location.start?.percentage
-      ?? (bookRef.current?.locations.percentageFromCfi(cfi) || 0);
-    latestRef.current = { location: cfi, percentage: Math.min(100, Math.max(0, ratio * 100)) };
+    let ratio = location.start?.percentage;
+    if (ratio == null && locationsReadyRef.current) {
+      ratio = bookRef.current?.locations.percentageFromCfi(cfi) || 0;
+    }
+    if (ratio == null) {
+      ratio = latestRef.current.percentage / 100;
+    }
+    latestRef.current = {
+      location: cfi,
+      percentage: Math.min(100, Math.max(0, ratio * 100)),
+    };
     setProgress(ratio);
     window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(saveNow, 1500);
